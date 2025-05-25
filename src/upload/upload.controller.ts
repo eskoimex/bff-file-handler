@@ -10,8 +10,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { UploadService } from './upload.service';
 import type { File as MulterFile } from 'multer';
+import { ConcurrencyGuard } from '../common/concurrency.guard';
 
 @Controller('upload')
+@UseGuards(ConcurrencyGuard)
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
