@@ -7,18 +7,22 @@ import { UploadModule } from './upload/upload.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { DynamicRateLimiterMiddleware } from './common/middleware/dynamic-rate-limiter.middleware';
+import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { CommonModule } from './common/common.module';
+
 
 @Module({
   imports: [
     ThrottlerModule.forRoot({
       throttlers: [{
-        ttl: 10000, 
-        limit: 1,
+        ttl: Number(process.env.THROTTLE_TTL), 
+        limit: Number(process.env.THROTTLE_LIMIT),
       }]
     }),
     UploadModule,
     AuthModule,
     HealthModule,
+    CommonModule
   ],
   controllers: [AppController],
   providers: [
@@ -33,5 +37,10 @@ export class AppModule implements NestModule {
     consumer
       .apply(DynamicRateLimiterMiddleware)
       .forRoutes('upload'); 
+
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  
   }
 }
+
+

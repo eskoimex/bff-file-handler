@@ -9,9 +9,9 @@ export class CircuitBreakerService {
     this.breaker = new CircuitBreaker(
       async (fn: () => Promise<any>) => await fn(),
       {
-        timeout: 10000,
-        errorThresholdPercentage: 50,
-        resetTimeout: 30000,
+        timeout: Number(process.env.CIRCUIT_BREAKER_TIMEOUT),
+        errorThresholdPercentage: Number(process.env.CIRCUIT_BREAKER_ERROR_THRESHOLD_PERCENTAGE),
+        resetTimeout: Number(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT),
       },
     );
   }
