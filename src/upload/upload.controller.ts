@@ -11,9 +11,10 @@ import { diskStorage } from 'multer';
 import { UploadService } from './upload.service';
 import type { File as MulterFile } from 'multer';
 import { ConcurrencyGuard } from '../common/concurrency.guard';
+import { AuthGuard } from '../common/auth.guard';
 
 @Controller('upload')
-@UseGuards(ConcurrencyGuard)
+@UseGuards(AuthGuard, ConcurrencyGuard)
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
