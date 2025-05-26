@@ -1,99 +1,150 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 📁 BFF File Handler Service (NestJS)
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A secure, resilient, and dynamically throttled file upload service built with NestJS. Supports large (~250MB) CSV file uploads and system-aware request handling.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 🚀 Features
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- 📤 Multipart CSV Uploads up to 250MB
+- 🔐 Basic Authentication on all endpoints
+- ⚖️ Dynamic Throttling based on CPU and memory usage
+- 🛑 Circuit Breaker with configurable thresholds
+- ⏳ Rate Limiting: 1 request every 10 seconds per client
+- 🧵 Concurrency Limiting: Max 5 parallel uploads
+- 🔁 Resilient Streaming with filesystem error fallback
+- 📊 `/health` endpoints for observability, system's CPU pressure, available memory,and the health status of all external dependencies.
+- 📈 Structured Logging with per-request correlation (`requestId`)
+- 🐳 Docker-ready, with CI/CD support
 
-## Project setup
+---
 
-```bash
-$ npm install
+## 🧪 API Endpoints
+
+### `POST /upload`
+
+- Uploads a CSV file securely.
+
+#### 🔐 Headers
+- `Authorization: Basic <base64(user:pass)>`
+- `Content-Type: multipart/form-data`
+
+#### 📦 Body
+- Key: `file`
+- Value: CSV file (up to 250MB)
+
+#### ⚠️ Constraints
+- File type: `.csv` only
+- Max 5 concurrent uploads
+- 1 upload per 10 seconds per client
+- Uploads rejected under high CPU/memory load
+
+# Postman curl sample for pload endpoint
+curl -X POST http://localhost:3000/upload \
+  -H "Authorization: Basic $(echo -n 'user:pass' | base64)" \
+  -F "file=@./your-file.csv"
+
+
+### `GET /health`
+
+Returns system health metrics:
+
+```json
+{
+    "status": "ok",
+    "cpu": "31.9%",
+    "freeMemory": "1263.81MB",
+    "dependencies": {
+        "fileSystemWritable": true,
+        "circuitBreaker": "healthy"
+    }
+}
 ```
 
-## Compile and run the project
-
+# Postman curl sample for health endpoint
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+curl -X GET http://localhost:3000/health
 ```
 
-## Run tests
 
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# Expected behaviour under load
+```
+| Condition                            | Expected Behavior                                                |
+| ------------------------------------ | ---------------------------------------------------------------- |
+| CPU Load > Configured Threshold      | Upload requests are rejected with HTTP `400` and logged          |
+| Free Memory < Configured Threshold   | Uploads are rejected with HTTP `400`                             |
+| > 5 Concurrent Uploads               | Requests are queued or rejected with HTTP `429`                  |
+| > 1 Request / 10s from same client   | Request is throttled with HTTP `429`                             |
+| Circuit Breaker Open                 | Uploads are blocked; clients receive HTTP `503`                  |
+| Upload Exceeds Max File Size (250MB) | Rejected with HTTP `413 Payload Too Large`                       |
+| Unexpected File System Error         | Handled with retry logic; if persistent, upload fails gracefully |
+| Invalid File Type or Extension       | Rejected with HTTP `400`                                         |
 ```
 
-## Deployment
+# Error handling
+```
+| Status | Reason                               | Message                               |
+| ------ | ------------------------------------ | ------------------------------------- |
+| 400    | Invalid input / wrong file extension | `"Only .csv files are allowed"`       |
+| 400    | System resources exceeded            | `"System under high load, try later"` |
+| 401    | Missing or invalid credentials       | `"Unauthorized"`                      |
+| 413    | File exceeds max size                | `"File too large"`                    |
+| 429    | Rate limit exceeded (1 per 10s)      | `"Too many requests"`                 |
+| 503    | Circuit breaker open (high failure)  | `"Service temporarily unavailable"`   |
+| 500    | Unhandled errors                     | `"Internal server error"`             |
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g mau
-$ mau deploy
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+# Clone project
+git clone https://github.com/eskoimex/bff-file-handler.git
+cd bff-file-handler
 
-## Resources
+# Install dependencies
+npm install
 
-Check out a few resources that may come in handy when working with NestJS:
+# Create uploads folder
+mkdir uploads
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+# Add env vars
+cp .env.example .env
 
-## Support
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+# Returns recent structured logs for debugging and traceability.
 
-## Stay in touch
+- **Headers**: Basic Auth required
+- **Query Params**: `limit` (optional, default: 100)
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
 
-## License
+- **Headers**: Basic Auth required
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```
+| Variable          | Description             |
+| ----------------- | ----------------------- |
+| `BASIC_AUTH_USER` | Username for Basic Auth |
+| `BASIC_AUTH_PASS` | Password for Basic Auth |
+
+```
+
+
+# run test
+npm run test
+
+
+## 🛡️ Security & Resilience
+
+- All endpoints require Basic Authentication.
+- Uploads are protected by rate limiting and concurrency controls.
+- Circuit breaker prevents system overload and enables graceful degradation.
+- Health and metrics endpoints provide real-time observability.
+
+---
+
+## 🐳 Docker Usage
+
+Build and run with:
+
+```bash
+docker build -t bff-file-handler .
+docker run -p 3000:3000 bff-file-handler
+```
+
