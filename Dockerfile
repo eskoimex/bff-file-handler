@@ -1,4 +1,7 @@
-FROM node:18
+FROM node:24-alpine	
+
+# Update system packages to reduce vulnerabilities
+RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
