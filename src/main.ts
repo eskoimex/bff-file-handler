@@ -20,6 +20,7 @@ async function bootstrap() {
   const jsonLogger = new JsonLoggerService(contextService);
   app.useLogger(jsonLogger);
 
+
   
   app.useGlobalInterceptors();
 

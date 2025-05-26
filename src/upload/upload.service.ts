@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { createWriteStream } from 'fs';
 import { join } from 'path';
 import { pipeline } from 'stream/promises';
@@ -16,31 +16,31 @@ export class UploadService {
 
   async handleUpload(file: MulterFile): Promise<void> {
     if (!file) {
-      throw new InternalServerErrorException('File is required.');
+      throw new BadRequestException('File is required.');
     }
 
     const { originalname, stream, size, mimetype } = file;
 
     if (!originalname) {
-      throw new InternalServerErrorException('File with a valid name is required.');
+      throw new BadRequestException('File with a valid name is required.');
     }
 
     if (!stream) {
-      throw new InternalServerErrorException('File stream is required.');
+      throw new BadRequestException('File stream is required.');
     }
 
     if (size > this.MAX_FILE_SIZE) {
-      throw new InternalServerErrorException(
+      throw new BadRequestException(
         `File size exceeds ${this.MAX_FILE_SIZE / (1024 * 1024)}MB limit.`,
       );
     }
 
     if (mimetype !== this.ALLOWED_MIMETYPE) {
-      throw new InternalServerErrorException(`Only CSV files are allowed.`);
+      throw new BadRequestException(`Only CSV files are allowed.`);
     }
 
     if (!originalname.toLowerCase().endsWith(this.ALLOWED_EXTENSION)) {
-      throw new InternalServerErrorException(`File must have a ${this.ALLOWED_EXTENSION} extension.`);
+      throw new BadRequestException(`File must have a ${this.ALLOWED_EXTENSION} extension.`);
     }
 
     const filePath = join(__dirname, '..', '..', 'uploads', originalname);
@@ -56,14 +56,14 @@ export class UploadService {
       try {
         await pipeline(stream, writeStream);
       } catch {
-        throw new InternalServerErrorException('Failed to write file stream.');
+        throw new BadRequestException('Failed to write file stream.');
       }
     };
 
     try {
       await limit(writeFn);
     } catch (err) {
-      throw new InternalServerErrorException(err.message || 'File upload failed.');
+      throw new BadRequestException(err.message || 'File upload failed.');
     }
   }
 
@@ -73,7 +73,7 @@ export class UploadService {
     const cpuCount = os.cpus().length;
 
     if (freeMemRatio < this.MEMORY_THRESHOLD || loadAvg > cpuCount * this.CPU_LOAD_MULTIPLIER) {
-      throw new InternalServerErrorException('System under high load. Try again later.');
+      throw new BadRequestException('System under high load. Try again later.');
     }
   }
 }
